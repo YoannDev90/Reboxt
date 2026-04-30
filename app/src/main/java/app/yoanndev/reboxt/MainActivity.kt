@@ -78,6 +78,7 @@ fun PowerSchedulerScreen() {
     var secureSettingsGranted by remember { 
         mutableStateOf(context.checkSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED) 
     }
+    var shellMode by remember { mutableStateOf(ShellExecutor.getAvailableMode()) }
     
     var offTime by remember { mutableStateOf("22:00") }
     var onTime by remember { mutableStateOf("07:00") }
@@ -113,13 +114,21 @@ fun PowerSchedulerScreen() {
                 StatusLine("WRITE_SETTINGS", writeSettingsGranted)
                 StatusLine("WRITE_SECURE_SETTINGS", secureSettingsGranted)
                 
+                val shellStatusText = when (shellMode) {
+                    ShellExecutor.Mode.ROOT -> "ROOT (Available)"
+                    ShellExecutor.Mode.SHIZUKU -> "SHIZUKU (Available)"
+                    ShellExecutor.Mode.NONE -> "No Shell Access (Root or Shizuku)"
+                }
+                StatusLine(shellStatusText, shellMode != ShellExecutor.Mode.NONE)
+                
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     IconButton(onClick = {
                         writeSettingsGranted = Settings.System.canWrite(context)
                         secureSettingsGranted = context.checkSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED
-                        addLog("Refresh: WRITE=$writeSettingsGranted, SECURE=$secureSettingsGranted")
+                        shellMode = ShellExecutor.getAvailableMode()
+                        addLog("Refresh: WRITE=$writeSettingsGranted, SECURE=$secureSettingsGranted, SHELL=$shellMode")
                     }) {
                         Icon(Icons.Default.Refresh, "Refresh permissions")
                     }
@@ -159,19 +168,35 @@ fun PowerSchedulerScreen() {
 
         Button(
             onClick = {
+                val calendar = Calendar.getInstance()
+                val parts = onTime.split(":")
+                if (parts.size == 2) {
+                    calendar.set(Calendar.HOUR_OF_DAY, parts[0].toInt())
+                    calendar.set(Calendar.MINUTE, parts[1].toInt())
+                    calendar.set(Calendar.SECOND, 0)
+                    
+                    // If time already passed today, schedule for tomorrow
+                    if (calendar.timeInMillis < System.currentTimeMillis()) {
+                        calendar.add(Calendar.DAY_OF_YEAR, 1)
+                    }
+                    
+                    val result = PowerSchedulePOC.schedulePowerOnWithElevated(calendar.timeInMillis)
+                    addLog("Elevated Boot Result: $result")
+                }
+                
                 val success = tryModifySettings(context, onTime, offTime)
                 if (success) {
-                    addLog("Success: Set Off $offTime / On $onTime")
+                    addLog("Settings: Set Off $offTime / On $onTime")
                     Toast.makeText(context, "Schedules updated!", Toast.LENGTH_SHORT).show()
                 } else {
-                    addLog("Error: Modification failed. Check ADB permissions.")
+                    addLog("Settings: Modification failed.")
                     Toast.makeText(context, "Failed to update settings.", Toast.LENGTH_LONG).show()
                 }
             },
             modifier = Modifier.fillMaxWidth(),
-            enabled = writeSettingsGranted
+            enabled = writeSettingsGranted || shellMode != ShellExecutor.Mode.NONE
         ) {
-            Text("Apply Schedule Directly")
+            Text("Apply Schedule Everywhere")
         }
 
         Spacer(modifier = Modifier.height(16.dp))

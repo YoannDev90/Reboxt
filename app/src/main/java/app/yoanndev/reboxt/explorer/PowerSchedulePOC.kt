@@ -21,45 +21,36 @@ object PowerSchedulePOC {
     private const val EXTRA_BOOT_TIME = "boot_time"
 
     /**
-     * Checks if Shizuku is available and has permissions.
-     */
-    fun isShizukuReady(): Boolean {
-        if (!Shizuku.pingBinder()) return false
-        return Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED
-    }
-
-    /**
-     * Schedules a "Power On" event at the specified epoch time using Shizuku.
+     * Schedules a "Power On" event at the specified epoch time using available elevated permissions.
      * 
      * @param epochMillis The desired wake-up time in milliseconds
      */
-    fun schedulePowerOnWithShizuku(epochMillis: Long): String {
-        Log.d(TAG, "Attempting to schedule Power On via Shizuku at: $epochMillis")
+    fun schedulePowerOnWithElevated(epochMillis: Long): String {
+        Log.d(TAG, "Attempting to schedule Power On via elevated shell at: $epochMillis")
         
-        if (!isShizukuReady()) {
-            return "Error: Shizuku not ready or permission denied"
-        }
-
         val adbCmd = "am start-service -a $ACTION_RESET_BOOT_TIME --el $EXTRA_BOOT_TIME $epochMillis $PACKAGE_SECURITY_CENTER/$SERVICE_BOOT_ALARM"
         
-        return try {
-            val process = Shizuku.newProcess(adbCmd.split(" ").toTypedArray(), null, null)
-            val output = InputStreamReader(process.inputStream).readText()
-            val error = InputStreamReader(process.errorStream).readText()
-            process.waitFor()
-            
-            if (error.isNotEmpty()) {
-                Log.e(TAG, "Shizuku error: $error")
-                "Error: $error"
-            } else {
-                Log.i(TAG, "Shizuku result: $output")
-                output
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to execute Shizuku command", e)
-            "Exception: ${e.message}"
+        val result = ShellExecutor.exec(adbCmd)
+        return if (result.isSuccess) {
+            Log.i(TAG, "Success: ${result.output}")
+            result.output.ifEmpty { "Success" }
+        } else {
+            Log.e(TAG, "Error: ${result.error}")
+            "Error: ${result.error}"
         }
     }
+
+    /**
+     * Checks if Shizuku is available and has permissions.
+     * @deprecated Use ShellExecutor.isShizukuAvailable()
+     */
+    fun isShizukuReady(): Boolean = ShellExecutor.isShizukuAvailable()
+
+    /**
+     * Schedules a "Power On" event at the specified epoch time using Shizuku.
+     * @deprecated Use schedulePowerOnWithElevated
+     */
+    fun schedulePowerOnWithShizuku(epochMillis: Long): String = schedulePowerOnWithElevated(epochMillis)
 
     /**
      * Legacy method for direct service call (will fail on non-root/non-system).

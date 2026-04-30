@@ -8,6 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import rikka.shizuku.Shizuku
 
 @Composable
 fun SettingExplorerUI(
@@ -19,6 +20,18 @@ fun SettingExplorerUI(
     var diffs by remember { mutableStateOf<List<SettingDiff>>(emptyList()) }
     var lastSnapshot by remember { mutableStateOf<List<SettingEntry>?>(null) }
     var isLoading by remember { mutableStateOf(false) }
+    var shizukuStatus by remember { mutableStateOf("Checking...") }
+    var resultMessage by remember { mutableStateOf("") }
+
+    LaunchedEffect(Unit) {
+        shizukuStatus = if (PowerSchedulePOC.isShizukuReady()) {
+            "Ready"
+        } else if (!Shizuku.pingBinder()) {
+            "Not Running"
+        } else {
+            "Permission Required"
+        }
+    }
     
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -68,11 +81,6 @@ fun SettingExplorerUI(
             Text("Snapshot taken (${snapshot.size} keys).", color = MaterialTheme.colorScheme.primary)
             Text("1. Change a setting in HyperOS settings.")
             Text("2. Come back and click 'Compare' above.")
-            
-            if (snapshot.size < 10) {
-                Text("Warning: Very few keys detected (${snapshot.size}). The app might lack permissions to read settings properly.", 
-                    color = MaterialTheme.colorScheme.error)
-            }
         } else {
             Text("Instructions:", style = MaterialTheme.typography.titleMedium)
             Text("This tool helps find which system setting key changes when you toggle an option in HyperOS.")
@@ -87,17 +95,33 @@ fun SettingExplorerUI(
         Divider()
         Spacer(modifier = Modifier.height(16.dp))
 
-        Text("MIUI Power Hardware Bridge POC", style = MaterialTheme.typography.titleMedium)
-        Text("Trigger internal power-on alarms using discovered intents.", style = MaterialTheme.typography.bodySmall)
+        Text("HyperOS Power Hardware Bridge", style = MaterialTheme.typography.titleMedium)
+        Text("Shizuku Status: $shizukuStatus", 
+            color = if (shizukuStatus == "Ready") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
         
-        Button(
-            modifier = Modifier.padding(top = 8.dp),
-            onClick = {
-                val targetTime = System.currentTimeMillis() + 3600000L
-                PowerSchedulePOC.schedulePowerOn(context, targetTime)
+        Row(modifier = Modifier.padding(top = 8.dp)) {
+            Button(
+                enabled = shizukuStatus == "Ready",
+                onClick = {
+                    val targetTime = System.currentTimeMillis() + 3600000L
+                    resultMessage = PowerSchedulePOC.schedulePowerOnWithShizuku(targetTime)
+                }
+            ) {
+                Text("Schedule Power On (In 1h)")
             }
-        ) {
-            Text("Test Power On Schedule (In 1h)")
+
+            if (shizukuStatus == "Permission Required") {
+                Button(
+                    modifier = Modifier.padding(start = 8.dp),
+                    onClick = { Shizuku.requestPermission(0) }
+                ) {
+                    Text("Grant Shizuku")
+                }
+            }
+        }
+
+        if (resultMessage.isNotEmpty()) {
+            Text("Result: $resultMessage", style = MaterialTheme.typography.bodySmall)
         }
     }
 }
