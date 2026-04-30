@@ -26,19 +26,43 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import app.yoanndev.reboxt.explorer.*
 import app.yoanndev.reboxt.ui.theme.ReboxtTheme
 import java.util.*
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val repository = SettingsSnapshotRepository(contentResolver)
+        val classifier = SettingClassifier()
+        val diffEngine = DiffEngine(classifier)
+
         setContent {
             ReboxtTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    PowerSchedulerScreen()
+                    var showExplorer by remember { mutableStateOf(false) }
+                    
+                    Column {
+                        if (!showExplorer) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                PowerSchedulerScreen()
+                            }
+                        } else {
+                            Box(modifier = Modifier.weight(1f)) {
+                                SettingExplorerUI(repository, diffEngine)
+                            }
+                        }
+                        
+                        Button(
+                            onClick = { showExplorer = !showExplorer },
+                            modifier = Modifier.fillMaxWidth().padding(16.dp)
+                        ) {
+                            Text(if (showExplorer) "Back to Scheduler" else "Open Settings Explorer")
+                        }
+                    }
                 }
             }
         }
