@@ -100,4 +100,16 @@ object Logger {
             null
         }
     }
+
+    fun clearOldLogs(thresholdMillis: Long) {
+        val cutoff = System.currentTimeMillis() - thresholdMillis
+        _logs.removeAll { it.timestamp < cutoff }
+        
+        // Rewrite log file
+        try {
+            logFile?.writeText(_logs.reversed().joinToString("\n") { it.toString() } + "\n")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to rewrite log file after clearing", e)
+        }
+    }
 }

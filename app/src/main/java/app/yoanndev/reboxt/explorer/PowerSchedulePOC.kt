@@ -28,16 +28,27 @@ object PowerSchedulePOC {
     fun schedulePowerOnWithElevated(epochMillis: Long): String {
         Log.d(TAG, "Attempting to schedule Power On via elevated shell at: $epochMillis")
         
-        // We use 'am start-service --user 0' because we are targeting a system component
-        val adbCmd = "am start-service --user 0 -a $ACTION_RESET_BOOT_TIME --el $EXTRA_BOOT_TIME $epochMillis $PACKAGE_SECURITY_CENTER/$SERVICE_BOOT_ALARM"
+        // Use 'am broadcast' because SET_POWER_ON_OFF is a receiver, or targets the power center directly.
+        // Also, com.miui.powercenter.SET_POWER_ON_OFF is often used to trigger the schedule update.
+        // We try both the service reset and the direct PowerCenter broadcast.
+        
+        val adbCmd = "am broadcast -a com.miui.powercenter.SET_POWER_ON_OFF --el boot_time $epochMillis --ei power_on_enabled 1"
         
         val result = ShellExecutor.exec(adbCmd)
-        return if (result.isSuccess) {
-            Log.i(TAG, "Success: ${result.output}")
-            result.output.ifEmpty { "Success" }
+        if (result.isSuccess) {
+            return "Broadcast Success: ${result.output}"
+        }
+
+        // Fallback or secondary: Try direct service call with the older intent but as a broadcast if it was meant to be one
+        val fallbackCmd = "am broadcast --user 0 -a $ACTION_RESET_BOOT_TIME --el $EXTRA_BOOT_TIME $epochMillis $PACKAGE_SECURITY_CENTER"
+        val fallbackResult = ShellExecutor.exec(fallbackCmd)
+
+        return if (fallbackResult.isSuccess) {
+            Log.i(TAG, "Success via fallback: ${fallbackResult.output}")
+            fallbackResult.output.ifEmpty { "Success (Fallback)" }
         } else {
-            Log.e(TAG, "Error: ${result.error}")
-            "Error: ${result.error}"
+            Log.e(TAG, "Error: ${fallbackResult.error}")
+            "Error: ${fallbackResult.error}"
         }
     }
 

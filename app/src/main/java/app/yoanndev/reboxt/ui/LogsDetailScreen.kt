@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -37,6 +38,12 @@ fun LogsDetailScreen(onBack: () -> Unit) {
                     }
                 },
                 actions = {
+                    IconButton(onClick = {
+                        Logger.clearOldLogs(3600000L) // 1 hour
+                        Toast.makeText(context, "Logs older than 1h cleared", Toast.LENGTH_SHORT).show()
+                    }) {
+                        Icon(Icons.Default.DeleteSweep, contentDescription = "Clear old logs")
+                    }
                     IconButton(onClick = {
                         val file = Logger.exportToFile(context)
                         if (file != null) {
