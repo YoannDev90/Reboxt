@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -18,6 +19,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,13 +28,19 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import app.yoanndev.reboxt.data.Logger
 import app.yoanndev.reboxt.explorer.*
+import app.yoanndev.reboxt.ui.SettingsMenu
+import app.yoanndev.reboxt.ui.PermissionsDetailScreen
+import app.yoanndev.reboxt.ui.LogsDetailScreen
+import app.yoanndev.reboxt.ui.CreditsScreen
 import app.yoanndev.reboxt.ui.theme.ReboxtTheme
 import java.util.*
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Logger.init(this)
         val repository = SettingsSnapshotRepository(contentResolver)
         val classifier = SettingClassifier()
         val diffEngine = DiffEngine(classifier)
@@ -43,24 +51,49 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    var showExplorer by remember { mutableStateOf(false) }
+                    var currentScreen by remember { mutableStateOf("scheduler") }
                     
-                    Column {
-                        if (!showExplorer) {
-                            Box(modifier = Modifier.weight(1f)) {
-                                PowerSchedulerScreen()
-                            }
+                    BackHandler(enabled = currentScreen != "scheduler") {
+                        if (currentScreen.startsWith("settings_")) {
+                            currentScreen = "settings"
                         } else {
-                            Box(modifier = Modifier.weight(1f)) {
-                                SettingExplorerUI(repository, diffEngine)
+                            currentScreen = "scheduler"
+                        }
+                    }
+
+                    Column {
+                        Box(modifier = Modifier.weight(1f)) {
+                            when (currentScreen) {
+                                "scheduler" -> PowerSchedulerScreen()
+                                "explorer" -> SettingExplorerUI(repository, diffEngine)
+                                "settings" -> SettingsMenu(onNavigate = { currentScreen = it })
+                                "settings_permissions" -> PermissionsDetailScreen(onBack = { currentScreen = "settings" })
+                                "settings_logs" -> LogsDetailScreen(onBack = { currentScreen = "settings" })
+                                "settings_credits" -> CreditsScreen(onBack = { currentScreen = "settings" })
                             }
                         }
                         
-                        Button(
-                            onClick = { showExplorer = !showExplorer },
-                            modifier = Modifier.fillMaxWidth().padding(16.dp)
-                        ) {
-                            Text(if (showExplorer) "Back to Scheduler" else "Open Settings Explorer")
+                        if (!currentScreen.startsWith("settings_")) {
+                            NavigationBar {
+                                NavigationBarItem(
+                                    icon = { Icon(Icons.Default.Refresh, "Schedule") },
+                                    label = { Text("Schedule") },
+                                    selected = currentScreen == "scheduler",
+                                    onClick = { currentScreen = "scheduler" }
+                                )
+                                NavigationBarItem(
+                                    icon = { Icon(Icons.Default.ContentCopy, "Explorer") },
+                                    label = { Text("Explorer") },
+                                    selected = currentScreen == "explorer",
+                                    onClick = { currentScreen = "explorer" }
+                                )
+                                NavigationBarItem(
+                                    icon = { Icon(Icons.Default.Shield, "Settings") },
+                                    label = { Text("Settings") },
+                                    selected = currentScreen.startsWith("settings"),
+                                    onClick = { currentScreen = "settings" }
+                                )
+                            }
                         }
                     }
                 }
@@ -82,12 +115,6 @@ fun PowerSchedulerScreen() {
     
     var offTime by remember { mutableStateOf("22:00") }
     var onTime by remember { mutableStateOf("07:00") }
-    var logs by remember { mutableStateOf("App started\n") }
-
-    fun addLog(msg: String) {
-        val time = java.text.SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
-        logs += "[$time] $msg\n"
-    }
 
     Column(
         modifier = Modifier
@@ -98,55 +125,8 @@ fun PowerSchedulerScreen() {
     ) {
         Text(text = "Reboxt", style = MaterialTheme.typography.headlineLarge)
         Text(text = "FOSS Native Power Scheduler", style = MaterialTheme.typography.bodyMedium)
-        
+
         Spacer(modifier = Modifier.height(24.dp))
-
-        Card(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = if (writeSettingsGranted && secureSettingsGranted) 
-                    MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
-            )
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Permissions Status", style = MaterialTheme.typography.titleMedium)
-                Spacer(modifier = Modifier.height(8.dp))
-                StatusLine("WRITE_SETTINGS", writeSettingsGranted)
-                StatusLine("WRITE_SECURE_SETTINGS", secureSettingsGranted)
-                
-                val shellStatusText = when (shellMode) {
-                    ShellExecutor.Mode.ROOT -> "ROOT (Available)"
-                    ShellExecutor.Mode.SHIZUKU -> "SHIZUKU (Available)"
-                    ShellExecutor.Mode.NONE -> "No Shell Access (Root or Shizuku)"
-                }
-                StatusLine(shellStatusText, shellMode != ShellExecutor.Mode.NONE)
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    IconButton(onClick = {
-                        writeSettingsGranted = Settings.System.canWrite(context)
-                        secureSettingsGranted = context.checkSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED
-                        shellMode = ShellExecutor.getAvailableMode()
-                        addLog("Refresh: WRITE=$writeSettingsGranted, SECURE=$secureSettingsGranted, SHELL=$shellMode")
-                    }) {
-                        Icon(Icons.Default.Refresh, "Refresh permissions")
-                    }
-                    if (!writeSettingsGranted) {
-                        Button(onClick = {
-                            val intent = Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS).apply {
-                                data = Uri.parse("package:${context.packageName}")
-                            }
-                            context.startActivity(intent)
-                        }) {
-                            Text("Fix Write")
-                        }
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
 
         OutlinedTextField(
             value = offTime,
@@ -175,21 +155,20 @@ fun PowerSchedulerScreen() {
                     calendar.set(Calendar.MINUTE, parts[1].toInt())
                     calendar.set(Calendar.SECOND, 0)
                     
-                    // If time already passed today, schedule for tomorrow
                     if (calendar.timeInMillis < System.currentTimeMillis()) {
                         calendar.add(Calendar.DAY_OF_YEAR, 1)
                     }
                     
                     val result = PowerSchedulePOC.schedulePowerOnWithElevated(calendar.timeInMillis)
-                    addLog("Elevated Boot Result: $result")
+                    Logger.i("Schedule", "Elevated Boot Result: $result")
                 }
                 
                 val success = tryModifySettings(context, onTime, offTime)
                 if (success) {
-                    addLog("Settings: Set Off $offTime / On $onTime")
+                    Logger.i("Schedule", "Settings: Set Off $offTime / On $onTime")
                     Toast.makeText(context, "Schedules updated!", Toast.LENGTH_SHORT).show()
                 } else {
-                    addLog("Settings: Modification failed.")
+                    Logger.e("Schedule", "Settings: Modification failed.")
                     Toast.makeText(context, "Failed to update settings.", Toast.LENGTH_LONG).show()
                 }
             },
@@ -197,43 +176,6 @@ fun PowerSchedulerScreen() {
             enabled = writeSettingsGranted || shellMode != ShellExecutor.Mode.NONE
         ) {
             Text("Apply Schedule Everywhere")
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text("Debug Logs", style = MaterialTheme.typography.titleSmall, modifier = Modifier.align(Alignment.Start))
-        Surface(
-            modifier = Modifier.fillMaxWidth().height(150.dp).padding(vertical = 4.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            shape = MaterialTheme.shapes.small
-        ) {
-            Box {
-                SelectionContainer {
-                    Text(
-                        text = logs,
-                        modifier = Modifier.padding(8.dp).verticalScroll(rememberScrollState()),
-                        style = MaterialTheme.typography.labelSmall
-                    )
-                }
-                IconButton(
-                    onClick = { 
-                        clipboardManager.setText(AnnotatedString(logs))
-                        Toast.makeText(context, "Logs copied", Toast.LENGTH_SHORT).show()
-                    },
-                    modifier = Modifier.align(Alignment.TopEnd)
-                ) {
-                    Icon(Icons.Default.ContentCopy, "Copy logs", modifier = Modifier.size(16.dp))
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedButton(
-            onClick = { openNativeScheduleSettings(context) },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Open OEM Settings UI (Backup)")
         }
     }
 }
@@ -296,3 +238,4 @@ fun openNativeScheduleSettings(context: Context): Boolean {
     }
     return false
 }
+
