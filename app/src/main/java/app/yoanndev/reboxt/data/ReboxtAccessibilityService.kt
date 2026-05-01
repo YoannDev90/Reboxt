@@ -9,6 +9,10 @@ import android.util.Log
 
 class ReboxtAccessibilityService : AccessibilityService() {
 
+    companion object {
+        var instance: ReboxtAccessibilityService? = null
+    }
+
     private var currentSteps: List<AccessibilityStep>? = null
     private var currentStepIndex = 0
 
@@ -39,9 +43,9 @@ class ReboxtAccessibilityService : AccessibilityService() {
                     }
                     startActivity(intent)
                     currentStepIndex++
-                    // On attend l'event d'accessibilité pour l'étape suivante
                 } catch (e: Exception) {
                     Log.e("Accessibility", "Failed to launch intent", e)
+                    currentSteps = null 
                 }
             }
             "find_id", "find_text" -> {
@@ -51,7 +55,6 @@ class ReboxtAccessibilityService : AccessibilityService() {
                         node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
                     }
                     currentStepIndex++
-                    // Attendez un peu ou l'event suivant
                 }
             }
         }
@@ -68,7 +71,6 @@ class ReboxtAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (currentSteps != null) {
-            // Tentative d'exécution de l'étape suivante à chaque changement d'écran
             executeNextStep()
         }
     }
@@ -79,6 +81,12 @@ class ReboxtAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        instance = this
         Log.i("Accessibility", "Service connected")
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        instance = null
     }
 }

@@ -81,12 +81,17 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+import android.accessibilityservice.AccessibilityService
+import android.view.accessibility.AccessibilityManager
+import app.yoanndev.reboxt.data.AccessibilityEngine
+import app.yoanndev.reboxt.data.DeviceDetector
+import app.yoanndev.reboxt.data.ReboxtAccessibilityService
+
 @Composable
 fun PowerSchedulerScreen() {
     val context = LocalContext.current
     
-    var writeSettingsGranted by remember { mutableStateOf(Settings.System.canWrite(context)) }
-    
+    val deviceInfo = remember { DeviceDetector.detect() }
     var offTime by remember { mutableStateOf("22:00") }
     var onTime by remember { mutableStateOf("07:00") }
 
@@ -122,13 +127,28 @@ fun PowerSchedulerScreen() {
 
         Button(
             onClick = {
-                val success = tryModifySettings(context, onTime, offTime)
-                if (success) {
-                    Logger.i("Schedule", "Settings: Set Off $offTime / On $onTime")
-                    Toast.makeText(context, "Schedules updated!", Toast.LENGTH_SHORT).show()
+                val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
+                val isServiceEnabled = am.getEnabledAccessibilityServiceList(AccessibilityService.FEEDBACK_GENERIC)
+                    .any { it.resolveInfo.serviceInfo.packageName == context.packageName }
+
+                if (!isServiceEnabled) {
+                    Toast.makeText(context, "Please enable Accessibility Service first!", Toast.LENGTH_LONG).show()
+                    return@Button
+                }
+
+                AccessibilityEngine.loadSchemas(context)
+                val schema = AccessibilityEngine.findAndLoadBestSchema(context, deviceInfo)
+                
+                if (schema != null) {
+                    val service = ReboxtAccessibilityService.instance
+                    if (service != null) {
+                        Toast.makeText(context, "Starting automation...", Toast.LENGTH_SHORT).show()
+                        service.startAutomation(schema)
+                    } else {
+                        Toast.makeText(context, "Service is enabled but not active. Try toggling it.", Toast.LENGTH_LONG).show()
+                    }
                 } else {
-                    Logger.e("Schedule", "Settings: Modification failed.")
-                    Toast.makeText(context, "Failed to update settings.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "No schema found for your device.", Toast.LENGTH_LONG).show()
                 }
             },
             modifier = Modifier.fillMaxWidth()
