@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Reboxt</string>
+    <string name="accessibility_service_description">Automate power scheduling on supported devices.</string>
 </resources>
