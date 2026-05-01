@@ -28,6 +28,7 @@ object Logger {
 
     fun i(tag: String, msg: String) = addLog("INFO", tag, msg)
     fun d(tag: String, msg: String) = addLog("DEBUG", tag, msg)
+    fun w(tag: String, msg: String) = addLog("WARN", tag, msg)
     fun e(tag: String, msg: String, tr: Throwable? = null) = addLog("ERROR", tag, msg + (tr?.let { "\n${it.stackTraceToString()}" } ?: ""))
 
     fun init(context: Context) {

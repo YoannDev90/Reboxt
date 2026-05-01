@@ -34,6 +34,7 @@ import app.yoanndev.reboxt.data.ReboxtAccessibilityService
 import app.yoanndev.reboxt.ui.SettingsMenu
 import app.yoanndev.reboxt.ui.PermissionsDetailScreen
 import app.yoanndev.reboxt.ui.CreditsScreen
+import app.yoanndev.reboxt.ui.LogsScreen
 import app.yoanndev.reboxt.ui.theme.ReboxtTheme
 import java.util.*
 
@@ -62,6 +63,7 @@ class MainActivity : ComponentActivity() {
                                 "settings" -> SettingsMenu(onNavigate = { currentScreen = it })
                                 "settings_permissions" -> PermissionsDetailScreen(onBack = { currentScreen = "settings" })
                                 "settings_credits" -> CreditsScreen(onBack = { currentScreen = "settings" })
+                                "settings_logs" -> LogsScreen(onBack = { currentScreen = "settings" })
                             }
                         }
                         

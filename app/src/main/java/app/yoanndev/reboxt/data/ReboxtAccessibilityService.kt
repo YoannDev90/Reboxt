@@ -25,13 +25,13 @@ class ReboxtAccessibilityService : AccessibilityService() {
     private fun executeNextStep() {
         val steps = currentSteps ?: return
         if (currentStepIndex >= steps.size) {
-            Log.i("Accessibility", "Automation completed")
+            Logger.i("Accessibility", "Automation completed successfully")
             currentSteps = null
             return
         }
 
         val step = steps[currentStepIndex]
-        Log.d("Accessibility", "Executing step $currentStepIndex: ${step.type} - ${step.value}")
+        Logger.d("Accessibility", "Executing step $currentStepIndex: ${step.type} - ${step.value}")
 
         when (step.type) {
             "launch_intent" -> {
@@ -41,48 +41,69 @@ class ReboxtAccessibilityService : AccessibilityService() {
                         component = ComponentName(parts[0], parts[1])
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     }
+                    Logger.i("Accessibility", "Launching intent: ${parts[0]} / ${parts[1]}")
                     startActivity(intent)
                     currentStepIndex++
                 } catch (e: Exception) {
-                    Log.e("Accessibility", "Failed to launch intent", e)
+                    Logger.e("Accessibility", "Failed to launch intent: ${step.value}", e)
                     currentSteps = null 
                 }
             }
             "find_id", "find_text" -> {
                 val node = findNode(step)
                 if (node != null) {
+                    Logger.i("Accessibility", "Found node for ${step.value}, performing ${step.action}")
                     if (step.action == "click") {
-                        node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                        val clicked = node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                        Logger.d("Accessibility", "Click action result: $clicked")
                     }
                     currentStepIndex++
+                } else {
+                    Logger.w("Accessibility", "Node not found for ${step.value} (Type: ${step.type}). Waiting for next event...")
                 }
             }
         }
     }
 
     private fun findNode(step: AccessibilityStep): AccessibilityNodeInfo? {
-        val rootNode = rootInActiveWindow ?: return null
+        val rootNode = rootInActiveWindow
+        if (rootNode == null) {
+            Logger.w("Accessibility", "rootInActiveWindow is null")
+            return null
+        }
         return when (step.type) {
-            "find_id" -> rootNode.findAccessibilityNodeInfosByViewId(step.value).firstOrNull()
-            "find_text" -> rootNode.findAccessibilityNodeInfosByText(step.value).firstOrNull()
+            "find_id" -> {
+                val nodes = rootNode.findAccessibilityNodeInfosByViewId(step.value)
+                Logger.d("Accessibility", "Searching by ID: ${step.value}. Found ${nodes.size} nodes.")
+                nodes.firstOrNull()
+            }
+            "find_text" -> {
+                val nodes = rootNode.findAccessibilityNodeInfosByText(step.value)
+                Logger.d("Accessibility", "Searching by Text: ${step.value}. Found ${nodes.size} nodes.")
+                nodes.firstOrNull()
+            }
             else -> null
         }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (currentSteps != null) {
+        if (currentSteps != null && event != null) {
+            Logger.d("Accessibility", "Event: ${AccessibilityEvent.eventTypeToString(event.eventType)} from ${event.packageName}")
             executeNextStep()
         }
     }
 
     override fun onInterrupt() {
-        Log.w("Accessibility", "Service interrupted")
+        Logger.w("Accessibility", "Service interrupted")
     }
+
+    fun i(tag: String, msg: String) = Logger.i(tag, msg)
+    fun w(tag: String, msg: String) = Logger.w("Accessibility", msg) // Helper for accessibility specific warnings
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
-        Log.i("Accessibility", "Service connected")
+        Logger.i("Accessibility", "Service connected and instance set")
     }
 
     override fun onDestroy() {

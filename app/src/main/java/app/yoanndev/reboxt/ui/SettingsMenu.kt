@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -43,6 +44,15 @@ fun SettingsMenu(onNavigate: (String) -> Unit) {
             subtitle = "Art and dependencies credits",
             icon = Icons.Default.Info,
             onClick = { onNavigate("settings_credits") }
+        )
+
+        Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+        MenuItem(
+            title = "Logs",
+            subtitle = "View and export application logs",
+            icon = Icons.Default.List,
+            onClick = { onNavigate("settings_logs") }
         )
 
         Spacer(modifier = Modifier.height(24.dp))
