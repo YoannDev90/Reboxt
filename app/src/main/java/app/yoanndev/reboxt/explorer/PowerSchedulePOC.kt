@@ -28,7 +28,8 @@ object PowerSchedulePOC {
     fun schedulePowerOnWithElevated(epochMillis: Long): String {
         Log.d(TAG, "Attempting to schedule Power On via elevated shell at: $epochMillis")
         
-        val adbCmd = "am start-service -a $ACTION_RESET_BOOT_TIME --el $EXTRA_BOOT_TIME $epochMillis $PACKAGE_SECURITY_CENTER/$SERVICE_BOOT_ALARM"
+        // We use 'am start-service --user 0' because we are targeting a system component
+        val adbCmd = "am start-service --user 0 -a $ACTION_RESET_BOOT_TIME --el $EXTRA_BOOT_TIME $epochMillis $PACKAGE_SECURITY_CENTER/$SERVICE_BOOT_ALARM"
         
         val result = ShellExecutor.exec(adbCmd)
         return if (result.isSuccess) {
