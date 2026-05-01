@@ -4,7 +4,7 @@
   "steps": [
     {
       "type": "launch_intent",
-      "value": "com.android.settings/.Settings$BatterySettingsActivity",
+      "value": "com.miui.securitycenter/.powercenter.PowerShutdownOnTime|com.miui.securitycenter/.powercenter.PowerCenterActivity|android.settings.SETTINGS",
       "action": "launch"
     },
     {

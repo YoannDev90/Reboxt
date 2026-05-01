@@ -35,18 +35,25 @@ class ReboxtAccessibilityService : AccessibilityService() {
 
         when (step.type) {
             "launch_intent" -> {
-                try {
-                    val parts = step.value.split("/")
-                    val intent = Intent().apply {
-                        component = ComponentName(parts[0], parts[1])
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                val launchTargets = step.value.split("|").map { it.trim() }.filter { it.isNotEmpty() }
+                var launched = false
+
+                for (target in launchTargets) {
+                    try {
+                        val intent = buildLaunchIntent(target)
+                        Logger.i("Accessibility", "Launching intent target: $target")
+                        startActivity(intent)
+                        launched = true
+                        currentStepIndex++
+                        break
+                    } catch (e: Exception) {
+                        Logger.w("Accessibility", "Launch target failed: $target")
                     }
-                    Logger.i("Accessibility", "Launching intent: ${parts[0]} / ${parts[1]}")
-                    startActivity(intent)
-                    currentStepIndex++
-                } catch (e: Exception) {
-                    Logger.e("Accessibility", "Failed to launch intent: ${step.value}", e)
-                    currentSteps = null 
+                }
+
+                if (!launched) {
+                    Logger.e("Accessibility", "Failed to launch all targets for step: ${step.value}")
+                    currentSteps = null
                 }
             }
             "find_id", "find_text" -> {
@@ -83,6 +90,23 @@ class ReboxtAccessibilityService : AccessibilityService() {
                 nodes.firstOrNull()
             }
             else -> null
+        }
+    }
+
+    private fun buildLaunchIntent(target: String): Intent {
+        return if (target.contains("/")) {
+            val parts = target.split("/", limit = 2)
+            Intent().apply {
+                component = ComponentName(parts[0], parts[1])
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        } else {
+            when (target) {
+                "android.settings.SETTINGS" -> Intent(android.provider.Settings.ACTION_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                else -> throw IllegalArgumentException("Unsupported launch target: $target")
+            }
         }
     }
 

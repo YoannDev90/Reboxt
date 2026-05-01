@@ -102,15 +102,27 @@ object Logger {
         }
     }
 
+    fun remove(entry: LogEntry) {
+        _logs.remove(entry)
+        persistLogs()
+    }
+
+    fun clearAll() {
+        _logs.clear()
+        persistLogs()
+    }
+
     fun clearOldLogs(thresholdMillis: Long) {
         val cutoff = System.currentTimeMillis() - thresholdMillis
         _logs.removeAll { it.timestamp < cutoff }
-        
-        // Rewrite log file
+        persistLogs()
+    }
+
+    private fun persistLogs() {
         try {
-            logFile?.writeText(_logs.reversed().joinToString("\n") { it.toString() } + "\n")
+            logFile?.writeText(_logs.reversed().joinToString("\n") { it.toString() })
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to rewrite log file after clearing", e)
+            Log.e(TAG, "Failed to persist logs", e)
         }
     }
 }
