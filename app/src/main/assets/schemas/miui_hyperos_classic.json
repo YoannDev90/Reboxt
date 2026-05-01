@@ -1,0 +1,21 @@
+{
+  "id": "miui_hyperos_classic",
+  "name": "MIUI/HyperOS Standard",
+  "steps": [
+    {
+      "type": "find_text",
+      "value": "Paramètres",
+      "action": "click"
+    },
+    {
+      "type": "find_text",
+      "value": "Batterie",
+      "action": "click"
+    },
+    {
+      "type": "find_text",
+      "value": "Programmer marche/arrêt",
+      "action": "click"
+    }
+  ]
+}

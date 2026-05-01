@@ -29,6 +29,21 @@ android {
             )
         }
     }
+
+    flavorDimensions += "connectivity"
+    productFlavors {
+        create("withInternet") {
+            dimension = "connectivity"
+            applicationIdSuffix = ".internet"
+            versionNameSuffix = "-internet"
+        }
+        create("noInternet") {
+            dimension = "connectivity"
+            applicationIdSuffix = ".local"
+            versionNameSuffix = "-local"
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
@@ -60,8 +75,5 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
 
-    // Shizuku
-    val shizukuVersion = "13.1.0"
-    implementation("dev.rikka.shizuku:api:$shizukuVersion")
-    implementation("dev.rikka.shizuku:provider:$shizukuVersion")
+    // Dependencies
 }

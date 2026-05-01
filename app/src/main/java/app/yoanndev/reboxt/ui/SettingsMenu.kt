@@ -1,14 +1,9 @@
 package app.yoanndev.reboxt.ui
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.*
@@ -18,10 +13,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import app.yoanndev.reboxt.data.DeviceDetector
 
 @Composable
 fun SettingsMenu(onNavigate: (String) -> Unit) {
     val context = LocalContext.current
+    val deviceInfo = remember { DeviceDetector.detect() }
+    
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -32,18 +30,9 @@ fun SettingsMenu(onNavigate: (String) -> Unit) {
 
         MenuItem(
             title = "Permissions",
-            subtitle = "Manage Shizuku, Root and System rights",
+            subtitle = "Manage Admin, Accessibility and Notifications",
             icon = Icons.Default.Security,
             onClick = { onNavigate("settings_permissions") }
-        )
-
-        Divider(modifier = Modifier.padding(vertical = 8.dp))
-
-        MenuItem(
-            title = "Logs",
-            subtitle = "View and export system logs",
-            icon = Icons.Default.Description,
-            onClick = { onNavigate("settings_logs") }
         )
 
         Divider(modifier = Modifier.padding(vertical = 8.dp))
@@ -54,6 +43,21 @@ fun SettingsMenu(onNavigate: (String) -> Unit) {
             icon = Icons.Default.Info,
             onClick = { onNavigate("settings_credits") }
         )
+
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        Text("Device Info", style = MaterialTheme.typography.titleMedium)
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Manufacturer: ${deviceInfo.manufacturer}", style = MaterialTheme.typography.bodySmall)
+                Text("Model: ${deviceInfo.model}", style = MaterialTheme.typography.bodySmall)
+                Text("Android: ${deviceInfo.androidVersion} (SDK ${deviceInfo.sdkInt})", style = MaterialTheme.typography.bodySmall)
+                Text("Skin: ${deviceInfo.skin.name} ${deviceInfo.skin.version}", style = MaterialTheme.typography.bodySmall)
+            }
+        }
     }
 }
 

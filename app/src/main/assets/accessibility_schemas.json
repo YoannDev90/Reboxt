@@ -1,0 +1,11 @@
+{
+  "schemas": [
+    {
+      "file": "miui_hyperos_classic.json",
+      "match": {
+        "manufacturer": "Xiaomi",
+        "skin": "MIUI/HyperOS"
+      }
+    }
+  ]
+}

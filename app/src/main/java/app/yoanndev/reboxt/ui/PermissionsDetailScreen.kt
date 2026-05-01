@@ -1,51 +1,48 @@
 package app.yoanndev.reboxt.ui
 
-import android.Manifest
+import android.accessibilityservice.AccessibilityServiceInfo
+import android.app.admin.DevicePolicyManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
 import android.provider.Settings
+import android.view.accessibility.AccessibilityManager
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.unit.dp
-import app.yoanndev.reboxt.data.Logger
-import app.yoanndev.reboxt.explorer.ShellExecutor
-import rikka.shizuku.Shizuku
+import app.yoanndev.reboxt.RebootReceiver
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PermissionsDetailScreen(onBack: () -> Unit) {
     val context = LocalContext.current
-    var writeSettingsGranted by remember { mutableStateOf(Settings.System.canWrite(context)) }
-    var secureSettingsGranted by remember { 
-        mutableStateOf(context.checkSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED) 
-    }
-    var shizukuGranted by remember { mutableStateOf(ShellExecutor.isShizukuAvailable()) }
-    var shizukuRunning by remember { mutableStateOf(ShellExecutor.isShizukuInstalledAndRunning()) }
-    var rootAvailable by remember { mutableStateOf(ShellExecutor.isRootAvailable()) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    
+    var isAdminEnabled by remember { mutableStateOf(checkAdminStatus(context)) }
+    var isAccessibilityEnabled by remember { mutableStateOf(isAccessibilityServiceEnabled(context)) }
+    var isNotificationEnabled by remember { mutableStateOf(areNotificationsEnabled(context)) }
 
-    // Listener for Shizuku permission result
-    val permissionListener = remember {
-        Shizuku.OnRequestPermissionResultListener { _, result ->
-            shizukuGranted = result == PackageManager.PERMISSION_GRANTED
-            Logger.i("Shizuku", "Permission result: $shizukuGranted")
+    // Update states when returning to foreground
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                isAdminEnabled = checkAdminStatus(context)
+                isAccessibilityEnabled = isAccessibilityServiceEnabled(context)
+                isNotificationEnabled = areNotificationsEnabled(context)
+            }
         }
-    }
-
-    DisposableEffect(Unit) {
-        Shizuku.addRequestPermissionResultListener(permissionListener)
+        lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
-            Shizuku.removeRequestPermissionResultListener(permissionListener)
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
@@ -57,18 +54,6 @@ fun PermissionsDetailScreen(onBack: () -> Unit) {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
-                },
-                actions = {
-                    IconButton(onClick = {
-                        writeSettingsGranted = Settings.System.canWrite(context)
-                        secureSettingsGranted = context.checkSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED
-                        shizukuGranted = ShellExecutor.isShizukuAvailable()
-                        shizukuRunning = ShellExecutor.isShizukuInstalledAndRunning()
-                        rootAvailable = ShellExecutor.isRootAvailable()
-                        Logger.i("UI", "Status Refreshed")
-                    }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
-                    }
                 }
             )
         }
@@ -76,113 +61,86 @@ fun PermissionsDetailScreen(onBack: () -> Unit) {
         Column(
             modifier = Modifier
                 .padding(padding)
-                .fillMaxSize()
                 .padding(16.dp)
-                .verticalScroll(rememberScrollState())
         ) {
-            Text("Access Methods", style = MaterialTheme.typography.titleLarge)
-            Spacer(modifier = Modifier.height(12.dp))
+            PermissionToggle(
+                title = "Device Administrator",
+                description = "Prevents MIUI from killing the app process.",
+                enabled = isAdminEnabled,
+                onToggle = {
+                    if (!isAdminEnabled) {
+                        val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
+                            putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, ComponentName(context, RebootReceiver::class.java))
+                            putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, "Required for app persistence.")
+                        }
+                        context.startActivity(intent)
+                    } else {
+                        val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+                        dpm.removeActiveAdmin(ComponentName(context, RebootReceiver::class.java))
+                        isAdminEnabled = false
+                    }
+                }
+            )
 
-            PermissionItem(
-                title = "Write System Settings",
-                description = "Required for basic schedule features",
-                isGranted = writeSettingsGranted,
-                onAction = {
-                    val intent = Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS).apply {
-                        data = Uri.parse("package:${context.packageName}")
+            Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+            PermissionToggle(
+                title = "Accessibility Service",
+                description = "Used to automate the native power schedule UI.",
+                enabled = isAccessibilityEnabled,
+                onToggle = {
+                    context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                }
+            )
+
+            Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+            PermissionToggle(
+                title = "Notifications",
+                description = "Show status of the scheduler.",
+                enabled = isNotificationEnabled,
+                onToggle = {
+                    val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                        putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
                     }
                     context.startActivity(intent)
                 }
             )
-
-            PermissionItem(
-                title = "Shizuku",
-                description = if (shizukuRunning) "Service is running" else "Service NOT detected",
-                isGranted = shizukuGranted,
-                onAction = {
-                    if (shizukuRunning) {
-                        try {
-                            Logger.i("UI", "Triggering Shizuku permission request...")
-                            Shizuku.requestPermission(1001)
-                        } catch (e: Exception) {
-                            Logger.e("UI", "Failed to request Shizuku permission", e)
-                        }
-                    } else {
-                        val intent = context.packageManager.getLaunchIntentForPackage("rikka.shizuku")
-                        if (intent != null) context.startActivity(intent)
-                        else Logger.e("UI", "Shizuku app not found")
-                    }
-                },
-                actionLabel = if (shizukuGranted) "Granted" else if (shizukuRunning) "Grant Permission" else "Open Shizuku"
-            )
-
-            PermissionItem(
-                title = "Root Access",
-                description = "Direct system execution (su)",
-                isGranted = rootAvailable,
-                onAction = { 
-                    rootAvailable = ShellExecutor.isRootAvailable()
-                    Logger.i("UI", "Root check: $rootAvailable")
-                },
-                actionLabel = "Check Root"
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f))
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Secure Settings info", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        "Currently: ${if(secureSettingsGranted) "Granted" else "Missing"}\n\n" +
-                        "To grant via ADB:\nadb shell pm grant ${context.packageName} android.permission.WRITE_SECURE_SETTINGS",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
         }
     }
 }
 
 @Composable
-fun PermissionItem(
+fun PermissionToggle(
     title: String,
     description: String,
-    isGranted: Boolean,
-    onAction: (() -> Unit)?,
-    actionLabel: String = "Fix"
+    enabled: Boolean,
+    onToggle: () -> Unit
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isGranted) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) 
-                             else MaterialTheme.colorScheme.surfaceVariant
-        )
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleSmall)
-                Text(description, style = MaterialTheme.typography.bodySmall)
-                Text(
-                    if (isGranted) "Status: GRANTED" else "Status: MISSING",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (isGranted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-                )
-            }
-            if (onAction != null && (!isGranted || actionLabel.startsWith("Check") || actionLabel.contains("Permission"))) {
-                Button(onClick = onAction, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)) {
-                    Text(actionLabel, style = MaterialTheme.typography.labelMedium)
-                }
-            }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(description, style = MaterialTheme.typography.bodySmall)
         }
+        Switch(checked = enabled, onCheckedChange = { onToggle() })
     }
+}
+
+private fun isAccessibilityServiceEnabled(context: Context): Boolean {
+    val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
+    val enabledServices = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_GENERIC)
+    return enabledServices.any { it.resolveInfo.serviceInfo.packageName == context.packageName }
+}
+
+private fun checkAdminStatus(context: Context): Boolean {
+    val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+    val adminName = ComponentName(context, RebootReceiver::class.java)
+    return dpm.isAdminActive(adminName)
+}
+
+private fun areNotificationsEnabled(context: Context): Boolean {
+    return androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()
 }
