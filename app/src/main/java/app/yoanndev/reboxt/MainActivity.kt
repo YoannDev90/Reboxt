@@ -190,7 +190,10 @@ fun StatusLine(name: String, granted: Boolean) {
 
 fun tryModifySettings(context: Context, onTime: String, offTime: String): Boolean {
     val cr = context.contentResolver
-    return try {
+    
+    // Attempt standard modification
+    var standardSuccess = true
+    try {
         val dayMask = 127
         Settings.System.putString(cr, "power_off_alarm_time", offTime)
         Settings.System.putInt(cr, "power_off_alarm_enabled", 1)
@@ -201,23 +204,40 @@ fun tryModifySettings(context: Context, onTime: String, offTime: String): Boolea
         Settings.System.putInt(cr, "power_on_alarm_enabled", 1)
         Settings.System.putInt(cr, "power_on_alarm_days", dayMask)
         Settings.Global.putInt(cr, "power_on_alarm_enabled", 1)
-
-        val actions = listOf(
-            "com.mediatek.schpwronoff.CHANGE_SCHEDULE",
-            "android.intent.action.set_pwr_on_off",
-            "com.android.settings.action.SCHEDULE_POWER_ON_OFF_CHANGED",
-            "com.miui.powercenter.SET_POWER_ON_OFF"
-        )
-        
-        actions.forEach { action ->
-            context.sendBroadcast(Intent(action))
-        }
-        
-        true
     } catch (e: Exception) {
-        android.util.Log.e("Reboxt", "Modification error", e)
-        false
+        android.util.Log.w("Reboxt", "Standard settings modification failed: ${e.message}")
+        standardSuccess = false
     }
+
+    // Attempt elevated modification as fallback or supplement
+    val elevatedSuccess = if (ShellExecutor.getAvailableMode() != ShellExecutor.Mode.NONE) {
+        val dayMask = "127"
+        val results = listOf(
+            ShellExecutor.putSettings("system", "power_off_alarm_time", offTime),
+            ShellExecutor.putSettings("system", "power_off_alarm_enabled", "1"),
+            ShellExecutor.putSettings("system", "power_off_alarm_days", dayMask),
+            ShellExecutor.putSettings("global", "power_off_alarm_enabled", "1"),
+            ShellExecutor.putSettings("system", "power_on_alarm_time", onTime),
+            ShellExecutor.putSettings("system", "power_on_alarm_enabled", "1"),
+            ShellExecutor.putSettings("system", "power_on_alarm_days", dayMask),
+            ShellExecutor.putSettings("global", "power_on_alarm_enabled", "1")
+        )
+        results.any { it }
+    } else false
+
+    // Broadcast update intents
+    val actions = listOf(
+        "com.mediatek.schpwronoff.CHANGE_SCHEDULE",
+        "android.intent.action.set_pwr_on_off",
+        "com.android.settings.action.SCHEDULE_POWER_ON_OFF_CHANGED",
+        "com.miui.powercenter.SET_POWER_ON_OFF"
+    )
+    
+    actions.forEach { action ->
+        context.sendBroadcast(Intent(action))
+    }
+    
+    return standardSuccess || elevatedSuccess
 }
 
 fun openNativeScheduleSettings(context: Context): Boolean {

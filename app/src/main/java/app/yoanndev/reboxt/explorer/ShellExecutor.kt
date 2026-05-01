@@ -65,6 +65,15 @@ object ShellExecutor {
         }
     }
 
+    fun putSettings(namespace: String, key: String, value: String): Boolean {
+        val cmd = "settings put $namespace $key \"$value\""
+        val result = exec(cmd)
+        if (!result.isSuccess) {
+            Logger.e(TAG, "Failed to set $key in $namespace: ${result.error}")
+        }
+        return result.isSuccess
+    }
+
     private fun execShizuku(command: String): ShellResult {
         Logger.d(TAG, "Exec Shizuku: $command")
         return try {
@@ -76,11 +85,12 @@ object ShellExecutor {
                 command
             }
             
-            val process = Shizuku.newProcess(arrayOf("sh", "-c", cmd), null, null)
+            @Suppress("DEPRECATION")
+            val process = Shizuku.newProcess(arrayOf("sh", "-c", cmd), null, null) /* check for alternative */ 
             val output = InputStreamReader(process.inputStream).readText()
             val error = InputStreamReader(process.errorStream).readText()
             val exitCode = process.waitFor()
-            Logger.d(TAG, "Results - Exit: $exitCode, Out: ${output.take(50)}, Err: ${error.take(50)}")
+            Logger.d(TAG, "Results - Exit: $exitCode, Out: $output, Err: $error")
             ShellResult(exitCode, output, error)
         } catch (e: Exception) {
             Logger.e(TAG, "Shizuku execution failed", e)
@@ -100,7 +110,7 @@ object ShellExecutor {
             val output = InputStreamReader(process.inputStream).readText()
             val error = InputStreamReader(process.errorStream).readText()
             val exitCode = process.waitFor()
-            Logger.d(TAG, "Results - Exit: $exitCode, Out: ${output.take(50)}, Err: ${error.take(50)}")
+            Logger.d(TAG, "Results - Exit: $exitCode, Out: $output, Err: $error")
             ShellResult(exitCode, output, error)
         } catch (e: Exception) {
             Logger.e(TAG, "Root execution failed", e)
