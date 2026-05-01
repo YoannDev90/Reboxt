@@ -1,6 +1,8 @@
 package app.yoanndev.reboxt
 
 import android.Manifest
+import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -8,6 +10,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
+import android.view.accessibility.AccessibilityManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -26,6 +29,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import app.yoanndev.reboxt.data.Logger
 import app.yoanndev.reboxt.data.AccessibilityEngine
+import app.yoanndev.reboxt.data.DeviceDetector
+import app.yoanndev.reboxt.data.ReboxtAccessibilityService
 import app.yoanndev.reboxt.ui.SettingsMenu
 import app.yoanndev.reboxt.ui.PermissionsDetailScreen
 import app.yoanndev.reboxt.ui.CreditsScreen
@@ -81,12 +86,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-import android.accessibilityservice.AccessibilityService
-import android.view.accessibility.AccessibilityManager
-import app.yoanndev.reboxt.data.AccessibilityEngine
-import app.yoanndev.reboxt.data.DeviceDetector
-import app.yoanndev.reboxt.data.ReboxtAccessibilityService
-
 @Composable
 fun PowerSchedulerScreen() {
     val context = LocalContext.current
@@ -128,7 +127,7 @@ fun PowerSchedulerScreen() {
         Button(
             onClick = {
                 val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
-                val isServiceEnabled = am.getEnabledAccessibilityServiceList(AccessibilityService.FEEDBACK_GENERIC)
+                val isServiceEnabled = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_GENERIC)
                     .any { it.resolveInfo.serviceInfo.packageName == context.packageName }
 
                 if (!isServiceEnabled) {
