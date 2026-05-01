@@ -36,15 +36,9 @@ fun CreditsScreen(onBack: () -> Unit) {
             "Created the Reboxt application icon."
         ),
         Credit(
-            "RikkaW",
-            "Shizuku Creator",
-            "https://github.com/RikkaApps/Shizuku",
-            "Developed the Shizuku API for adb shell access."
-        ),
-        Credit(
             "YoannDev",
             "Developer",
-            "https://github.com/yoann-dev",
+            "https://github.com/YoannDev90/Reboxt",
             "Main developer of the Reboxt application."
         )
     )

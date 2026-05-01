@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import app.yoanndev.reboxt.data.DeviceDetector
+import app.yoanndev.reboxt.data.DeviceInfo
 
 @Composable
 fun SettingsMenu(onNavigate: (String) -> Unit) {
@@ -56,9 +57,23 @@ fun SettingsMenu(onNavigate: (String) -> Unit) {
                 Text("Model: ${deviceInfo.model}", style = MaterialTheme.typography.bodySmall)
                 Text("Android: ${deviceInfo.androidVersion} (SDK ${deviceInfo.sdkInt})", style = MaterialTheme.typography.bodySmall)
                 Text("Skin: ${deviceInfo.skin.name} ${deviceInfo.skin.version}", style = MaterialTheme.typography.bodySmall)
+                
+                val supported = isDeviceSupported(deviceInfo)
+                Text(
+                    text = if (supported) "Supported" else "Unsupported",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (supported) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
             }
         }
     }
+}
+
+fun isDeviceSupported(deviceInfo: DeviceInfo): Boolean {
+    // These should ideally match the "skin" values in DeviceDetector.kt and accessibility_schemas.json
+    val supportedSkins = listOf("MIUI/HyperOS", "OxygenOS", "OneUI")
+    return supportedSkins.contains(deviceInfo.skin.name)
 }
 
 @Composable

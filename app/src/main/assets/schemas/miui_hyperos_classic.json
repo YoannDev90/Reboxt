@@ -3,18 +3,18 @@
   "name": "MIUI/HyperOS Standard",
   "steps": [
     {
-      "type": "find_text",
-      "value": "Paramètres",
+      "type": "launch_intent",
+      "value": "com.android.settings/.Settings$BatterySettingsActivity",
+      "action": "launch"
+    },
+    {
+      "type": "find_id",
+      "value": "com.miui.securitycenter:id/battery_extra_features",
       "action": "click"
     },
     {
-      "type": "find_text",
-      "value": "Batterie",
-      "action": "click"
-    },
-    {
-      "type": "find_text",
-      "value": "Programmer marche/arrêt",
+      "type": "find_id",
+      "value": "com.miui.securitycenter:id/schedule_power_on_off",
       "action": "click"
     }
   ]
